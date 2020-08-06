@@ -1,16 +1,25 @@
-# This is ftp shutil like functionality
-
-Installing this using python3 setup tools works. Requires root priviliges.
+# Overview
+This is a FTP library that provides simple means for downloading and uploading files.
+It can be installed using python3 setup tools works. Requires root priviliges.
 ```
 python3 setup.py install
 ```
+You can use directly ftpshutil/ftpshutil.py file in your project instead of installing with setup tools.
 
 # API
 Can be observed using examples/down.py. Provides FTPShutil class with the following methods:
  - download_dir
+     ```
+     def download_dir(self, directory):
+     ```
  - upload_dir
+     ```
+     def upload_dir(self, directory):
+     ```
  - quit
-We can add more later on.
+     ```
+     def quit(self):
+     ```
 
 The walk_ftp_dir method might be used to traverse a directory tree. As the first argument accepts python ftplib FTP object. The FTPShutil has ftp field, which represents this object. 
 ```
