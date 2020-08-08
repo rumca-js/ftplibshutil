@@ -8,27 +8,48 @@ You can use directly ftpshutil/ftpshutil.py file in your project instead of inst
 
 # API
 Can be observed using examples/down.py. Provides FTPShutil class with the following methods:
- - download_dir
+ - downloadtree
      ```
-     def download_dir(self, directory):
+     def downloadtree(self, directory, destination):
+
      ```
  - upload_dir
      ```
-     def upload_dir(self, directory):
+     def uploadtree(self, directory, destination):
+     ```
+ - mkdirs
+     ```
+     def mkdirs(self, path):
+     ```
+ - exists
+     ```
+     def exists(self, path):
+     ```
+ - uploadfile
+     ```
+     def uploadfile(self, local_file, remote_file):
+     ```
+ - downloadfile
+     ```
+     def downloadfile(self, remote_file, local_file):
+     ```
+ - get_ftplib_handle
+     ```
+     def get_ftplib_handle(self):
      ```
  - quit
      ```
      def quit(self):
      ```
 
-The walk_ftp_dir method might be used to traverse a directory tree. As the first argument accepts python ftplib FTP object. The FTPShutil has ftp field, which represents this object. 
+The walk_ftp_dir method might be used to traverse a directory tree. As the first argument accepts the FTPShutil object.
 ```
 def walk_ftp_dir(ftp, root_dir):
 ```
 This can be used therefore like
 ```
 ftp = FTPShutil(server,user,password)
-for root, dirs, files in walk_ftp_dir(ftp.ftp, "MyDirectory"):
+for root, dirs, files in walk_ftp_dir(ftp, "MyDirectory"):
     print(dirs)
     print(files)
 ```
