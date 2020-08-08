@@ -6,14 +6,16 @@ import re
 import argparse
 import logging
 
+# requires github/rumca-js/ftplibshutil
 import ftpshutil
 
 
 def connect():
-    myuser = 'anonymous'
-    mypass = 'anonymous'
+    mypass = "anonymouse@"
+    myuser = "anonymouse@"
+    myserver = 'server.com'
 
-    ftp = ftpshutil.FTPShutil('someserver.com', user=myuser, passwd=mypass )     # connect to host, default port
+    ftp = ftpshutil.FTPShutil(myserver, user=myuser, passwd=mypass )     # connect to host, default port
     logging.info("Connected")
     return ftp
 
@@ -33,17 +35,20 @@ def main():
 
     if args.download:
         ftp = connect()
-        ftp.download_dir("Documents")
-        ftp.download_dir("Backup")
+        ftp.downloadtree("/Documents", ".")
+        ftp.downloadtree("/Backup", ".")
+        ftp.downloadtree("/dyi-page", ".")
         ftp.quit()
     elif args.upload:
         ftp = connect()
-        ftp.upload_dir("Documents")
-        ftp.upload_dir("Backup")
+        ftp.uploadtree("Documents", "/")
+        ftp.uploadtree("Backup", "/")
+        ftp.uploadtree("dyi-page", "/")
         ftp.quit()
     else:
         parser.print_help()
 
 
 if __name__ == "__main__":
+    # execute only if run as a script
     main()

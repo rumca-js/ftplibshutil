@@ -15,12 +15,13 @@ logging.basicConfig(level=logging.INFO)
 from ftplib import *
 
 
-def walk_ftp_dir(ftp, root_dir):
+def walk_ftp_dir(ftp_shutil_obj, root_dir):
     dirs = []
     files = []
     lines = []
     clean_names = []
 
+    ftp = ftp_shutil_obj.get_ftplib_handle()
     ftp.cwd(root_dir)
 
     ftp.retrlines('LIST', lines.append)
@@ -44,60 +45,113 @@ def walk_ftp_dir(ftp, root_dir):
     yield root_dir, dirs, files
 
     for inner_dir in dirs:
-        for inner_root, inner_dirs, inner_files in walk_ftp_dir( ftp, os.path.join(root_dir, inner_dir)):
+        for inner_root, inner_dirs, inner_files in walk_ftp_dir( ftp_shutil_obj, os.path.join(root_dir, inner_dir)):
             yield os.path.join(root_dir,inner_root), inner_dirs, inner_files
 
 
 class FTPShutil(object):
 
     def __init__(self, host, user, passwd):
-        self.ftp = FTP(host, user=user, passwd=passwd )     # connect to host, default port 
+        self._ftp = FTP(host, user=user, passwd=passwd )     # connect to host, default port 
 
     def login(self, user, passwd):
-        return self.ftp.login(user, passwd)
+        return self._ftp.login(user, passwd)
 
     def quit(self):
-        self.ftp.quit()
+        self._ftp.quit()
 
-    def download_dir(self, directory):
+    def get_ftplib_handle(self):
+        return self._ftp
 
-        for root, dirs, files in walk_ftp_dir(self.ftp, "/"+directory):
-            for adir in dirs:
-                pass
+    def downloadfile(self, remote_file, local_file):
+        split_name = os.path.split(remote_file)
+        path = split_name[0]
 
-            for afile in files:
-                root_file = os.path.join(root, afile)
-                logging.info("Downloading file: {0}".format(root_file) )
+        if path[0] != "/":
+            path = "/"+path
 
-                dst_root = os.getcwd()+ root
+        self._ftp.cwd(path)
 
-                if not os.path.isdir(dst_root):
-                    os.makedirs(dst_root)
+        with open( local_file, 'wb') as fp:
+            self._ftp.retrbinary('RETR {0}'.format(split_name[1]), fp.write)
 
-                self.ftp.cwd(root)
-                dst_file = os.path.join(dst_root, afile)
+    def downloadtree(self, directory, destination):
+        '''
+        @brief Probably best to supply directory as an absolute FTP path.
+        '''
+        try:
+            for root, dirs, files in walk_ftp_dir(self, directory):
+                safe_root = root
+                if safe_root.find('/') == 0:
+                    safe_root = safe_root[1:]
 
-                with open( dst_file, 'wb') as fp:
-                    self.ftp.retrbinary('RETR {0}'.format(afile), fp.write)
+                for adir in dirs:
+                    pass
 
+                for afile in files:
+                    remote_file = os.path.join(safe_root, afile)
 
-    def upload_dir(self, directory):
+                    logging.info("Downloading file: {0}".format(remote_file) )
+
+                    local_root_dir = os.path.join(destination, safe_root)
+
+                    if not os.path.isdir(local_root_dir):
+                        os.makedirs(local_root_dir)
+
+                    self.downloadfile(remote_file, os.path.join(local_root_dir, afile))
+
+        except Exception as e:
+            print("Could not obtain directory {0}\n{1}".format(directory, str(e) ))
+
+    def uploadfile(self, local_file, remote_file):
+        '''
+        @brief Better supply with absolute FTP paths
+        '''
+        split_name = os.path.split(remote_file)
+        self._ftp.cwd(split_name[0])
+        self._ftp.storbinary('STOR {0}'.format(split_name[1]), open(local_file, 'rb'))
+
+    def exists(self, path):
+        '''
+        @brief for FTP part.
+        '''
+        logging.info("Checking if directory exists {0}".format(path))
+        split_name = os.path.split(path)
+        dir_list = self._ftp.nlst(split_name[0])
+
+        dir_list = [ os.path.split(x)[1] for x in dir_list] 
+        
+        if not split_name[1] in dir_list:
+            return False
+        return True
+
+    def mkdirs(self, path):
+        '''
+        @brief for FTP part.    
+        '''
+        split_name = os.path.split(path)
+        self._ftp.cwd(split_name[0])
+        self._ftp.mkd(split_name[1])
+
+    def uploadtree(self, directory, destination):
 
         for root, dirs, files in os.walk(directory, topdown=True):
 
-            for adir in dirs:
-                self.ftp.cwd("/")
-                dir_list = self.ftp.nlst(root)
+            remote_root = os.path.join(destination, root)
 
-                dst_dir = os.path.join(root, adir)
+            if not self.exists(remote_root):
+                self.mkdirs(remote_root)
+
+            for adir in dirs:
+                dst_dir = os.path.join(remote_root, adir)
                 
-                logging.info("Checking if directory exists {0}".format(dst_dir))
-                if not dst_dir in dir_list:
+                if not self.exists(dst_dir):
                     logging.info("Creating remote directory {0}".format(dst_dir))
-                    self.ftp.mkd(dst_dir)
+                    self.mkdirs(dst_dir)
 
             for afile in files:
-                remote_file = os.path.join(root, afile) 
-                logging.info("Sending file: {0}".format(remote_file))
-                self.ftp.cwd("/"+root)
-                self.ftp.storbinary('STOR {0}'.format(afile), open(remote_file, 'rb'))
+                remote_file = os.path.join(remote_root, afile)
+                local_file = os.path.join(root, afile)
+                logging.info("Sending file: {0} -> {1}".format(local_file, remote_file))
+                self.uploadfile(local_file, remote_file)
+
