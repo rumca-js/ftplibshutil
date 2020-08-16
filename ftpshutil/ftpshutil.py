@@ -42,11 +42,11 @@ def walk_ftp_dir(ftp_shutil_obj, root_dir):
         if ftype=="file":
             files.append(fname)
 
-    yield root_dir, dirs, files
-
     for inner_dir in dirs:
         for inner_root, inner_dirs, inner_files in walk_ftp_dir( ftp_shutil_obj, os.path.join(root_dir, inner_dir)):
             yield os.path.join(root_dir,inner_root), inner_dirs, inner_files
+
+    yield root_dir, dirs, files
 
 
 class FTPShutil(object):
