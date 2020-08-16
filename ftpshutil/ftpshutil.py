@@ -63,6 +63,34 @@ class FTPShutil(object):
     def get_ftplib_handle(self):
         return self._ftp
 
+    def listdir(self, root_dir):
+        lines = []
+        dirs = []
+        files = []
+
+        ftp = self.get_ftplib_handle()
+        ftp.cwd(root_dir)
+
+        ftp.retrlines('LIST', lines.append)
+
+        for line in lines:
+            m = re.search("([a-z-]*\s*\d*\s*\w*\s*\w*\s*\d*\s*\w*\s*\d*\s*\d*[:]*\d*\s*)", line)
+            fname = line[m.end(1):]
+
+            if line.find("d") == 0:
+                ftype = "dir"
+            elif line.find('-') == 0:
+                ftype = "file"
+            else:
+                ftype = "none"
+
+            if ftype == "dir":
+                dirs.append(fname)
+            if ftype=="file":
+                files.append(fname)
+
+        return dirs, files
+
     def downloadfile(self, remote_file, local_file):
         split_name = os.path.split(remote_file)
         path = split_name[0]
@@ -103,6 +131,16 @@ class FTPShutil(object):
         except Exception as e:
             print("Could not obtain directory {0}\n{1}".format(directory, str(e) ))
 
+    def isfile(self, file_path):
+        path, file_name = os.path.split(file_path)
+        dirs, files = self.listdir(path)
+        return file_name in files
+
+    def isdir(self, dir_path):
+        path, dir_name = os.path.split(dir_path)
+        dirs, files = self.listdir(path)
+        return dir_name in dirs
+
     def uploadfile(self, local_file, remote_file):
         '''
         @brief Better supply with absolute FTP paths
@@ -124,6 +162,26 @@ class FTPShutil(object):
         if not split_name[1] in dir_list:
             return False
         return True
+
+    def remove(self, path):
+        if self.isfile(path):
+            self._ftp.delete(path)
+        elif self.isdir(path):
+            self._ftp.rmd(path)
+        else:
+            raise IOError("FTP: Specified path does not exist: {0}".format(path))
+
+    def rmtree(self, directory):
+        logging.info("Removing directory: {0}".format(directory))
+        for root, dirs, files in walk_ftp_dir(self, directory):
+            for afile in files:
+                root_file = os.path.join(root, afile)
+                self.remove(root_file)
+
+            for adir in dirs:
+                self.rmtree( os.path.join(root, adir))
+
+        self.remove(directory)
 
     def mkdirs(self, path):
         '''
