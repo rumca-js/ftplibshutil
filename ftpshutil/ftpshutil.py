@@ -202,9 +202,18 @@ class FTPShutil(object):
     def uploadtree(self, directory, destination):
         logging.info("Uploading tree: {0} -> {1}".format(directory, destination))
 
+        lastdir = os.path.split(directory)[1]
+
         for root, dirs, files in os.walk(directory, topdown=True):
 
-            remote_root = os.path.join(destination, root)
+            inner_root = root.replace(directory, "")
+            if len(inner_root) > 0 and inner_root[0] == '/':
+                inner_root = inner_root[1:]
+
+            remote_root = os.path.join(destination, lastdir, inner_root)
+
+            if remote_root.endswith("/"):
+                remote_root = remote_root[:-1]
 
             if not self.exists(remote_root):
                 self.mkdirs(remote_root)
