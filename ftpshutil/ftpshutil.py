@@ -92,6 +92,8 @@ class FTPShutil(object):
         return dirs, files
 
     def downloadfile(self, remote_file, local_file):
+        logging.info("Downloading file: {0} -> {0}".format(remote_file, local_file) )
+
         split_name = os.path.split(remote_file)
         path = split_name[0]
 
@@ -107,6 +109,8 @@ class FTPShutil(object):
         '''
         @brief Probably best to supply directory as an absolute FTP path.
         '''
+        logging.info("Downloading tree: {0} -> {1}".format(directory, destination))
+
         try:
             for root, dirs, files in walk_ftp_dir(self, directory):
                 safe_root = root
@@ -118,8 +122,6 @@ class FTPShutil(object):
 
                 for afile in files:
                     remote_file = os.path.join(safe_root, afile)
-
-                    logging.info("Downloading file: {0}".format(remote_file) )
 
                     local_root_dir = os.path.join(destination, safe_root)
 
@@ -145,6 +147,8 @@ class FTPShutil(object):
         '''
         @brief Better supply with absolute FTP paths
         '''
+        logging.info("Uploading file: {0} -> {1}".format(local_file, remote_file))
+
         split_name = os.path.split(remote_file)
         self._ftp.cwd(split_name[0])
         self._ftp.storbinary('STOR {0}'.format(split_name[1]), open(local_file, 'rb'))
@@ -153,7 +157,8 @@ class FTPShutil(object):
         '''
         @brief for FTP part.
         '''
-        logging.info("Checking if directory exists {0}".format(path))
+        logging.debug("Checking if directory exists {0}".format(path))
+
         split_name = os.path.split(path)
         dir_list = self._ftp.nlst(split_name[0])
 
@@ -173,6 +178,7 @@ class FTPShutil(object):
 
     def rmtree(self, directory):
         logging.info("Removing directory: {0}".format(directory))
+
         for root, dirs, files in walk_ftp_dir(self, directory):
             for afile in files:
                 root_file = os.path.join(root, afile)
@@ -187,11 +193,14 @@ class FTPShutil(object):
         '''
         @brief for FTP part.    
         '''
+        logging.info("Creating remote directory {0}".format(path))
+
         split_name = os.path.split(path)
         self._ftp.cwd(split_name[0])
         self._ftp.mkd(split_name[1])
 
     def uploadtree(self, directory, destination):
+        logging.info("Uploading tree: {0} -> {1}".format(directory, destination))
 
         for root, dirs, files in os.walk(directory, topdown=True):
 
@@ -204,12 +213,10 @@ class FTPShutil(object):
                 dst_dir = os.path.join(remote_root, adir)
                 
                 if not self.exists(dst_dir):
-                    logging.info("Creating remote directory {0}".format(dst_dir))
                     self.mkdirs(dst_dir)
 
             for afile in files:
                 remote_file = os.path.join(remote_root, afile)
                 local_file = os.path.join(root, afile)
-                logging.info("Sending file: {0} -> {1}".format(local_file, remote_file))
                 self.uploadfile(local_file, remote_file)
 
