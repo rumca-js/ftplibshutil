@@ -15,13 +15,24 @@ logging.basicConfig(level=logging.INFO)
 from ftplib import *
 
 
-def walk_ftp_dir(ftp_shutil_obj, root_dir):
+def ftp_path_join(path1, path2, path3=None):
+    # TODO this has to be written better
+    if not path3:
+        joined = os.path.join(path1, path2)
+        return joined.replace("\\", "/")
+    else:
+        joined = os.path.join(path1, path2, path3)
+        return joined.replace("\\", "/")
+
+
+def walk_ftp_dir(ftp_shutil_obj, root_dir, topdown=True):
     dirs = []
     files = []
     lines = []
     clean_names = []
 
     ftp = ftp_shutil_obj.get_ftplib_handle()
+
     ftp.cwd(root_dir)
 
     ftp.retrlines('LIST', lines.append)
@@ -42,11 +53,17 @@ def walk_ftp_dir(ftp_shutil_obj, root_dir):
         if ftype=="file":
             files.append(fname)
 
-    for inner_dir in dirs:
-        for inner_root, inner_dirs, inner_files in walk_ftp_dir( ftp_shutil_obj, os.path.join(root_dir, inner_dir)):
-            yield os.path.join(root_dir,inner_root), inner_dirs, inner_files
+    if not topdown:
+        for inner_dir in dirs:
+            for inner_root, inner_dirs, inner_files in walk_ftp_dir( ftp_shutil_obj, ftp_path_join(root_dir, inner_dir), topdown):
+                yield ftp_path_join(root_dir,inner_root), inner_dirs, inner_files
 
     yield root_dir, dirs, files
+
+    if topdown:
+        for inner_dir in dirs:
+            for inner_root, inner_dirs, inner_files in walk_ftp_dir( ftp_shutil_obj, ftp_path_join(root_dir, inner_dir), topdown):
+                yield ftp_path_join, inner_dirs, inner_files
 
 
 class FTPShutil(object):
@@ -121,7 +138,7 @@ class FTPShutil(object):
                     pass
 
                 for afile in files:
-                    remote_file = os.path.join(safe_root, afile)
+                    remote_file = ftp_path_join(safe_root, afile)
 
                     local_root_dir = os.path.join(destination, safe_root)
 
@@ -168,26 +185,48 @@ class FTPShutil(object):
             return False
         return True
 
-    def remove(self, path):
-        if self.isfile(path):
+    def safe_remove(self, path):
+        try:
+            if self.isfile(path):
+                self._ftp.delete(path)
+            elif self.isdir(path):
+                self._ftp.rmd(path)
+            else:
+                raise IOError("FTP: Specified path does not exist: {0}".format(path))
+        except Exception as E:
+            print("Problem with removing: {0}".format(path))
+            raise E
+
+    def remove_file(self, path):
+        try:
+            path = os.path.normpath(path)
+            path = path.replace("\\", "/")
             self._ftp.delete(path)
-        elif self.isdir(path):
+        except Exception as E:
+            print("Problem with removing: {0}".format(path))
+            raise E
+
+    def remove_dir(self, path):
+        try:
+            path = os.path.normpath(path)
+            path = path.replace("\\", "/")
             self._ftp.rmd(path)
-        else:
-            raise IOError("FTP: Specified path does not exist: {0}".format(path))
+        except Exception as E:
+            print("Problem with removing: {0}".format(path))
+            raise E
 
     def rmtree(self, directory):
         logging.info("Removing directory: {0}".format(directory))
 
-        for root, dirs, files in walk_ftp_dir(self, directory):
+        for root, dirs, files in walk_ftp_dir(self, directory, False):
             for afile in files:
-                root_file = os.path.join(root, afile)
-                self.remove(root_file)
+                root_file = ftp_path_join(root, afile)
+                self.remove_file(root_file)
 
             for adir in dirs:
-                self.rmtree( os.path.join(root, adir))
+                self.rmtree( ftp_path_join(root, adir))
 
-        self.remove(directory)
+        self.remove_dir(directory)
 
     def mkdirs(self, path):
         '''
@@ -207,10 +246,11 @@ class FTPShutil(object):
         for root, dirs, files in os.walk(directory, topdown=True):
 
             inner_root = root.replace(directory, "")
-            if len(inner_root) > 0 and inner_root[0] == '/':
-                inner_root = inner_root[1:]
+            if len(inner_root) > 0:
+                if inner_root[0] == '/' or inner_root[0] == '\\':
+                    inner_root = inner_root[1:]
 
-            remote_root = os.path.join(destination, lastdir, inner_root)
+            remote_root = ftp_path_join(destination, lastdir, inner_root)
 
             if remote_root.endswith("/"):
                 remote_root = remote_root[:-1]
@@ -219,13 +259,13 @@ class FTPShutil(object):
                 self.mkdirs(remote_root)
 
             for adir in dirs:
-                dst_dir = os.path.join(remote_root, adir)
+                dst_dir = ftp_path_join(remote_root, adir)
                 
                 if not self.exists(dst_dir):
                     self.mkdirs(dst_dir)
 
             for afile in files:
-                remote_file = os.path.join(remote_root, afile)
+                remote_file = ftp_path_join(remote_root, afile)
                 local_file = os.path.join(root, afile)
                 self.uploadfile(local_file, remote_file)
 
