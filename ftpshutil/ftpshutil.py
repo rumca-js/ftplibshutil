@@ -63,7 +63,7 @@ def walk_ftp_dir(ftp_shutil_obj, root_dir, topdown=True):
     if topdown:
         for inner_dir in dirs:
             for inner_root, inner_dirs, inner_files in walk_ftp_dir( ftp_shutil_obj, ftp_path_join(root_dir, inner_dir), topdown):
-                yield ftp_path_join, inner_dirs, inner_files
+                yield ftp_path_join(root_dir,inner_root), inner_dirs, inner_files
 
 
 class FTPShutil(object):
