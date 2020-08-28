@@ -93,7 +93,7 @@ def main():
     elif args.test:
         ftp = connect()
 
-        print( ftp.read_file("index.html") )
+        print( ftp.read("index.html") )
 
         ftp.quit()
     else:

@@ -151,7 +151,7 @@ class FTPShutil(object):
         except Exception as e:
             print("Could not obtain directory {0}\n{1}".format(directory, str(e) ))
 
-    def read_file(self, file_path):
+    def read(self, file_path):
         r = BytesIO()
         self._ftp.retrbinary('RETR {0}'.format(file_path), r.write)
         return r.getvalue()
