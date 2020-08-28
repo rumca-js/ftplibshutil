@@ -238,7 +238,7 @@ class FTPShutil(object):
         self._ftp.cwd(split_name[0])
         self._ftp.mkd(split_name[1])
 
-    def renamte(self, fromname, toname):
+    def rename(self, fromname, toname):
         self._ftp.rename(fromname, toname)
 
     def uploadtree(self, directory, destination):
