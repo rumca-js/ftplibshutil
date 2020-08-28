@@ -239,6 +239,8 @@ class FTPShutil(object):
         self._ftp.mkd(split_name[1])
 
     def rename(self, fromname, toname):
+        logging.info("Rename file: {0} -> {1}".format(fromname, toname))
+
         self._ftp.rename(fromname, toname)
 
     def uploadtree(self, directory, destination):
