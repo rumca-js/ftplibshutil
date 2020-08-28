@@ -9,6 +9,7 @@ import os
 import re
 import argparse
 import logging
+from io import BytesIO
 
 logging.basicConfig(level=logging.INFO)
 
@@ -149,6 +150,11 @@ class FTPShutil(object):
 
         except Exception as e:
             print("Could not obtain directory {0}\n{1}".format(directory, str(e) ))
+
+    def read_file(self, file_path):
+        r = BytesIO()
+        self._ftp.retrbinary('RETR {0}'.format(file_path), r.write)
+        return r.getvalue()
 
     def isfile(self, file_path):
         path, file_name = os.path.split(file_path)
