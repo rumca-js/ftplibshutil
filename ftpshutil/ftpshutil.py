@@ -181,7 +181,9 @@ class FTPShutil(object):
                             continue
 
                 for adir in dirs:
-                    os.makedirs( os.path.join(local_root_dir, adir))
+                    full_dir = os.path.join(local_root_dir, adir)
+                    if not os.path.isdir(full_dir):
+                        os.makedirs(full_dir)
 
                 for afile in files:
                     remote_file = ftp_path_join(safe_root, afile)

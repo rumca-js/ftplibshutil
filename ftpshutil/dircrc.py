@@ -7,6 +7,9 @@ import configparser
 import glob
 
 
+crc_file_name = "crc_list.txt"
+
+
 def file_crc(afile):
     with open(afile, 'rb') as fh:
         data = fh.read()
@@ -18,7 +21,7 @@ def calc_dircrc(root, dirs, files):
     file_map = {}
     for name in sorted(files):
         big_name = os.path.join(root, name)
-        if name != 'crc_list.txt':
+        if name != crc_file_name:
             file_map[big_name] = file_crc(big_name)
         else:
             file_map[big_name] = -2
@@ -54,7 +57,7 @@ def save_map_file(file_name, file_map):
 def create_dircrc(directory):
     file_map = calc_dircrc_recursive(directory)
 
-    output_name = "crc_list.txt"
+    output_name = crc_file_name
     save_map_file(os.path.join(directory, output_name), file_map)
 
     return file_map
@@ -67,7 +70,7 @@ def create_dircrcs(directory):
         file_map = calc_dircrc(".", dirs, files)
         os.chdir(cur_path)
 
-        output_name = "crc_list.txt"
+        output_name = crc_file_name
         save_map_file( os.path.join(root, output_name), file_map)
 
 
@@ -81,7 +84,7 @@ def diff_dir(one_dir, two_dir):
 
 
 def copy_sync(src_dir, dst_dir, dst_handle):
-    dst_crc_list = os.path.join(dst_dir, "crc_list.txt")
+    dst_crc_list = os.path.join(dst_dir, crc_file_name)
     if not dst_handle.exists(dst_crc_list):
         dst_handle.copytree(src, dst_dir)
 
@@ -115,7 +118,7 @@ def copy_sync(src_dir, dst_dir, dst_handle):
 
 def remove_crc_files():
 
-    crc_file = "crc_list.txt"
+    crc_file = crc_file_name
     if os.path.isfile(crc_file):
         os.remove(crc_file)
 
