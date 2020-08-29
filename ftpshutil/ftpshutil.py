@@ -270,6 +270,8 @@ class FTPShutil(object):
         '''
         logging.info("Downloading tree: {0} -> {1}".format(directory, destination))
 
+        dircrc.create_dircrcs(destination)
+
         try:
             for root, dirs, files in walk_ftp_dir(self, directory):
 
@@ -338,6 +340,8 @@ class FTPShutil(object):
 
     def uploadtree_sync(self, directory, destination):
         logging.info("Uploading tree: {0} -> {1}".format(directory, destination))
+
+        dircrc.create_dircrcs(directory)
 
         lastdir = os.path.split(directory)[1]
 
