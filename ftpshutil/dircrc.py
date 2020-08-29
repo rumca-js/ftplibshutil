@@ -14,29 +14,30 @@ def file_crc(afile):
         return zlib.crc32(data)
 
 
-def calc_single_dir(root, dirs, files):
+def calc_dircrc(root, dirs, files):
     file_map = {}
-    for name in files:
+    for name in sorted(files):
         big_name = os.path.join(root, name)
         if name != 'crc_list.txt':
             file_map[big_name] = file_crc(big_name)
         else:
             file_map[big_name] = -2
 
-    for name in dirs:
+    for name in sorted(dirs):
         big_name = os.path.join(root, name)
         file_map[big_name] = -1   # special value, CRC is positive in python3
 
     return file_map
 
-def calc_directory_complete(directory, output_name = None):
+
+def calc_dircrc_recursive(directory):
     print("processing directory: {0}".format(directory))
 
     file_map = {}
 
     for root, dirs, files in os.walk(directory, topdown=False):
-        single_dir_map = calc_single_dir(root, dirs, files)
-        file_map.extend(single_dir_map)
+        single_dir_map = calc_dircrc(root, dirs, files)
+        file_map.update(single_dir_map)
 
     return file_map
 
@@ -50,8 +51,8 @@ def save_map_file(file_name, file_map):
         config.write(configfile)
 
 
-def process_directory_complete(directory):
-    file_map = calc_directory_complete(directory)
+def create_dircrc(directory):
+    file_map = calc_dircrc_recursive(directory)
 
     output_name = "crc_list.txt"
     save_map_file(os.path.join(directory, output_name), file_map)
@@ -59,12 +60,11 @@ def process_directory_complete(directory):
     return file_map
 
 
-def process_directories(directory):
-
+def create_dircrcs(directory):
     for root, dirs, files in os.walk(directory, topdown=False):
         cur_path = os.getcwd()
         os.chdir(root)
-        file_map = calc_single_dir(".", dirs, files)
+        file_map = calc_dircrc(".", dirs, files)
         os.chdir(cur_path)
 
         output_name = "crc_list.txt"
@@ -92,7 +92,7 @@ def copy_sync(src_dir, dst_dir, dst_handle):
     config.read(buf)
     dst_map = dict(config["CRC List"])
 
-    src_map = process_directory(src_dir)
+    src_map = create_crc_file(src_dir)
 
     src_keys = src_map.keys()
     dst_keys = dst_map.keys()
@@ -151,9 +151,9 @@ def main():
             sys.exit(1)
 
         if not args.each:
-            process_directory_complete(directory)
+            create_dircrc(directory)
         else:
-            process_directories(directory)
+            create_dircrcs(directory)
 
     elif args.diff:
         conf = configparser.ConfigParser()
