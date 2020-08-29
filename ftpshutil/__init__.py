@@ -1,2 +1,2 @@
 from .ftpshutil import *
-__all__ = ["ftpshutil"]
+__all__ = ["ftpshutil", "dircrc"]

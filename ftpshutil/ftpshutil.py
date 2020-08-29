@@ -10,6 +10,7 @@ import re
 import argparse
 import logging
 from io import BytesIO
+import ftpshutil.dircrc
 
 logging.basicConfig(level=logging.INFO)
 
@@ -151,6 +152,48 @@ class FTPShutil(object):
         except Exception as e:
             print("Could not obtain directory {0}\n{1}".format(directory, str(e) ))
 
+    def downloadtree_sync(self, directory, destination):
+        '''
+        @brief Probably best to supply directory as an absolute FTP path.
+        '''
+        logging.info("Downloading tree: {0} -> {1}".format(directory, destination))
+
+        try:
+            for root, dirs, files in walk_ftp_dir(self, directory):
+
+                safe_root = root
+                if safe_root.find('/') == 0:
+                    safe_root = safe_root[1:]
+
+                local_root_dir = os.path.join(destination, safe_root)
+
+                local_crc_file = os.path.join(local_root_dir, "crc_list.txt")
+                remote_crc_file = ftp_path_join(root, "crc_list.txt")
+                if os.path.isfile(local_crc_file):
+                    if self.exists(remote_crc_file):
+                        remote_crc = self.read(remote_crc_file)
+
+                        with open(local_crc_file, 'rb') as fh:
+                            local_crc = fh.read()
+
+                        if remote_crc == local_crc:
+                            logging.info("Skipping directory: {0}".format(root))
+                            continue
+
+                for adir in dirs:
+                    os.makedirs( os.path.join(local_root_dir, adir))
+
+                for afile in files:
+                    remote_file = ftp_path_join(safe_root, afile)
+
+                    if not os.path.isdir(local_root_dir):
+                        os.makedirs(local_root_dir)
+
+                    self.downloadfile(remote_file, os.path.join(local_root_dir, afile))
+
+        except Exception as e:
+            print("Could not obtain directory {0}\n{1}".format(directory, str(e) ))
+
     def read(self, file_path):
         r = BytesIO()
         self._ftp.retrbinary('RETR {0}'.format(file_path), r.write)
@@ -180,10 +223,14 @@ class FTPShutil(object):
         '''
         @brief for FTP part.
         '''
-        logging.debug("Checking if directory exists {0}".format(path))
+        logging.info("Checking if path exists {0}".format(path))
 
         split_name = os.path.split(path)
-        dir_list = self._ftp.nlst(split_name[0])
+
+        try:
+            dir_list = self._ftp.nlst(split_name[0])
+        except Exception as E:
+            return False
 
         dir_list = [ os.path.split(x)[1] for x in dir_list] 
         
@@ -279,4 +326,48 @@ class FTPShutil(object):
                 remote_file = ftp_path_join(remote_root, afile)
                 local_file = os.path.join(root, afile)
                 self.uploadfile(local_file, remote_file)
+
+    def uploadtree_sync(self, directory, destination):
+        logging.info("Uploading tree: {0} -> {1}".format(directory, destination))
+
+        lastdir = os.path.split(directory)[1]
+
+        for root, dirs, files in os.walk(directory, topdown=True):
+
+            inner_root = root.replace(directory, "")
+            if len(inner_root) > 0:
+                if inner_root[0] == '/' or inner_root[0] == '\\':
+                    inner_root = inner_root[1:]
+
+            remote_root = ftp_path_join(destination, lastdir, inner_root)
+
+            if remote_root.endswith("/"):
+                remote_root = remote_root[:-1]
+
+            crc_file = ftp_path_join(remote_root, "crc_list.txt")
+            if self.exists(crc_file):
+                remote_crc_data = self.read(crc_file)
+                local_crc_file = os.path.join(root, "crc_list.txt")
+
+                with open(local_crc_file, 'rb') as fh:
+                    local_crc = fh.read()
+
+                    if local_crc == remote_crc_data:
+                        logging.info("Skipping directory: {0}".format(root))
+                        continue
+
+            if not self.exists(remote_root):
+                self.mkdirs(remote_root)
+
+            for adir in dirs:
+                dst_dir = ftp_path_join(remote_root, adir)
+                
+                if not self.exists(dst_dir):
+                    self.mkdirs(dst_dir)
+
+            for afile in files:
+                remote_file = ftp_path_join(remote_root, afile)
+                local_file = os.path.join(root, afile)
+                self.uploadfile(local_file, remote_file)
+
 
