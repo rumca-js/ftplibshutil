@@ -54,6 +54,27 @@ for root, dirs, files in walk_ftp_dir(ftp, "MyDirectory"):
     print(files)
 ```
 
+# Experimental API with CRC
+
+Sometimes you do not want to transfer entire page into the Internet. You have a webpage, you modified one page and you need to transfer only that page, not entire image assets of your page.
+For every directory on your local file system a CRC checksum file is generated. If the checksum of that directory is exactly the same as the remote checksum, then this directory is skpped
+
+Download with CRC checking:
+ - downloadfile_sync
+     ```
+     def downloadfile_sync(self, remote_file, local_file):
+     ```
+
+Upload with CRC checking:
+ - downloadfile_sync
+     ```
+     def downloadfile_sync(self, remote_file, local_file):
+     ```
+
+It is important to know that right now the entire directory is transferred, is something is changed.
+
+The CRC file is a simple INI file, with one section. It contains a list of files with checksum values, and directory listing.
+
 # Other
 
 You can try installing this using pip. I have not checked if that works.
