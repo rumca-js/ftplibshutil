@@ -250,6 +250,23 @@ class FTPShutil(object):
         except Exception as e:
             print("Could not obtain directory {0}\n{1}".format(directory, str(e) ))
 
+    def diff_dircrc(self, local_crc_file, remote_crc_file):
+        """
+        @returns True if files are different, or one of the files is missing
+                 False if both files are present and equal.
+        """
+        if os.path.isfile(local_crc_file):
+            if self.exists(remote_crc_file):
+                remote_crc = self.read(remote_crc_file)
+
+                with open(local_crc_file, 'rb') as fh:
+                    local_crc = fh.read()
+
+                if remote_crc == local_crc:
+                    return False
+
+        return True
+
     def downloadtree_sync(self, directory, destination):
         '''
         @brief Probably best to supply directory as an absolute FTP path.
@@ -267,16 +284,10 @@ class FTPShutil(object):
 
                 local_crc_file = os.path.join(local_root_dir, dircrc.crc_file_name)
                 remote_crc_file = ftp_path_join(root, dircrc.crc_file_name)
-                if os.path.isfile(local_crc_file):
-                    if self.exists(remote_crc_file):
-                        remote_crc = self.read(remote_crc_file)
 
-                        with open(local_crc_file, 'rb') as fh:
-                            local_crc = fh.read()
-
-                        if remote_crc == local_crc:
-                            logging.info("Skipping directory: {0}".format(root))
-                            continue
+                if not self.diff_dircrc(local_crc_file, remote_crc_file):
+                    logging.info("Skipping directory: {0}".format(root))
+                    continue
 
                 for adir in dirs:
                     full_dir = os.path.join(local_root_dir, adir)
@@ -341,17 +352,12 @@ class FTPShutil(object):
             if remote_root.endswith("/"):
                 remote_root = remote_root[:-1]
 
-            crc_file = ftp_path_join(remote_root, dircrc.crc_file_name)
-            if self.exists(crc_file):
-                remote_crc_data = self.read(crc_file)
-                local_crc_file = os.path.join(root, dircrc.crc_file_name)
+            remote_crc_file = ftp_path_join(remote_root, dircrc.crc_file_name)
+            local_crc_file = os.path.join(root, dircrc.crc_file_name)
 
-                with open(local_crc_file, 'rb') as fh:
-                    local_crc = fh.read()
-
-                    if local_crc == remote_crc_data:
-                        logging.info("Skipping directory: {0}".format(root))
-                        continue
+            if not self.diff_dircrc(local_crc_file, remote_crc_file):
+                logging.info("Skipping directory: {0}".format(root))
+                continue
 
             if not self.exists(remote_root):
                 self.mkdirs(remote_root)
