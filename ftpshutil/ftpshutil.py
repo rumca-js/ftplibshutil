@@ -9,6 +9,8 @@ import os
 import re
 import argparse
 import logging
+import shutil
+
 from io import BytesIO
 import ftpshutil.dircrc as dircrc
 
@@ -154,7 +156,7 @@ class FTPShutil(object):
             if self.isfile(path):
                 self._ftp.delete(path)
             elif self.isdir(path):
-                self._ftp.rmd(path)
+                self.rmtree(path)
             else:
                 raise IOError("FTP: Specified path does not exist: {0}".format(path))
         except Exception as E:
@@ -228,13 +230,29 @@ class FTPShutil(object):
         with open( local_file, 'wb') as fp:
             self._ftp.retrbinary('RETR {0}'.format(split_name[1]), fp.write)
 
-    def make_local(self, local_root_dir, remote_root_dir, rem_dirs, rem_files):
+    def make_local(self, local_root_dir, remote_root_dir, rem_dirs, rem_files, crc_data = None):
         """
         @brief Adapts the local site according to the remote files.
 
         @TODO remove local directories that are not present on the remote site.
         @TODO remove local files that are not present on the remote site.
         """
+
+        if crc_data is not None:
+            rem_files = crc_data.get_1st_more_files()
+            rem_dirs = crc_data.get_1st_more_dirs()
+            rem_files.extend(crc_data.get_modified_files())
+
+            redundant_things = crc_data.get_2nd_more_files()
+            redundant_things.extend( crc_data.get_2nd_more_dirs())
+
+            for redundant in redundant_things:
+                redundant = os.path.join(local_root_dir, redundant)
+
+                if os.path.isfile(redundant):
+                    os.remove(redundant)
+                else:
+                    shutil.rmtree(redundant)
 
         for adir in rem_dirs:
             full_dir = os.path.join(local_root_dir, adir)
@@ -250,7 +268,7 @@ class FTPShutil(object):
 
             self.downloadfile(remote_file, local_file)
 
-    def make_remote(self, remote_root_dir, local_root_dir, loc_dirs, loc_files):
+    def make_remote(self, remote_root_dir, local_root_dir, loc_dirs, loc_files, crc_data = None):
         """
         @brief Adapts the local site according to the remote files.
 
@@ -258,7 +276,17 @@ class FTPShutil(object):
         @TODO remove local files that are not present on the remote site.
         """
 
-        rem_dirs, rem_files = self.listdir_ex(remote_root_dir)
+        if crc_data is not None:
+            loc_files = crc_data.get_2nd_more_files()
+            loc_dirs = crc_data.get_2nd_more_dirs()
+            loc_files.extend(crc_data.get_modified_files())
+
+            redundant_things = crc_data.get_1st_more_files()
+            redundant_things.extend( crc_data.get_1st_more_dirs())
+
+            for redundant in redundant_things:
+                redundant = ftp_path_join(remote_root_dir, redundant)
+                self.safe_remove(redundant)
 
         for adir in loc_dirs:
             full_dir = ftp_path_join(remote_root_dir, adir)
@@ -290,6 +318,23 @@ class FTPShutil(object):
         except Exception as e:
             print("Could not obtain directory {0}\n{1}".format(directory, str(e) ))
 
+    def uploadtree(self, directory, destination):
+        logging.info("Uploading tree: {0} -> {1}".format(directory, destination))
+
+        lastdir = os.path.split(directory)[1]
+
+        for root, dirs, files in os.walk(directory, topdown=True):
+
+            inner_root = root.replace(directory, "")
+            inner_root = safe_root(inner_root)
+
+            remote_root = ftp_path_join(destination, lastdir, inner_root)
+
+            if remote_root.endswith("/"):
+                remote_root = remote_root[:-1]
+
+            self.make_remote(remote_root, root, dirs, files)
+
     def diff_dircrc(self, local_crc_file, remote_crc_file):
         """
         @returns True if files are different, or one of the files is missing
@@ -316,7 +361,7 @@ class FTPShutil(object):
         dircrc.create_dircrcs(destination)
 
         try:
-            for root, dirs, files in walk_ftp_dir(self, directory):
+            for root, dirs, files in walk_ftp_dir(self, directory, topdown=True):
 
                 remote_root_dir  = safe_root(root)
                 local_root_dir = os.path.join(destination, remote_root_dir)
@@ -324,32 +369,30 @@ class FTPShutil(object):
                 local_crc_file = os.path.join(local_root_dir, dircrc.crc_file_name)
                 remote_crc_file = ftp_path_join(root, dircrc.crc_file_name)
 
-                if not self.diff_dircrc(local_crc_file, remote_crc_file):
-                    logging.info("Skipping directory: {0}".format(root))
-                    continue
+                if not self.exists(remote_crc_file) or not os.path.isfile(local_crc_file):
+                    logging.info("Processing directory: {0}".format(root))
 
-                self.make_local(local_root_dir, remote_root_dir, dirs, files)
+                    if os.path.isdir(local_root_dir):
+                        shutil.rmtree(local_root_dir)
+
+                    self.make_local(local_root_dir, remote_root_dir, dirs, files)
+                else:
+                    remote_crc_data = self.read(remote_crc_file).decode("utf-8")
+                    with open(local_crc_file, 'r') as fh:
+                        local_crc_data = fh.read()
+
+                    comp = dircrc.Comparator(remote_crc_data, local_crc_data)
+
+                    if comp.is_same():
+                        logging.info("Skipping directory: {0}".format(root))
+                        continue
+
+                    logging.info("Processing directory: {0}".format(root))
+
+                    self.make_local(local_root_dir, remote_root_dir, dirs, files, comp)
 
         except Exception as e:
             print("Could not obtain directory {0}\n{1}".format(directory, str(e) ))
-
-
-    def uploadtree(self, directory, destination):
-        logging.info("Uploading tree: {0} -> {1}".format(directory, destination))
-
-        lastdir = os.path.split(directory)[1]
-
-        for root, dirs, files in os.walk(directory, topdown=True):
-
-            inner_root = root.replace(directory, "")
-            inner_root = safe_root(inner_root)
-
-            remote_root = ftp_path_join(destination, lastdir, inner_root)
-
-            if remote_root.endswith("/"):
-                remote_root = remote_root[:-1]
-
-            self.make_remote(remote_root, root, dirs, files)
 
     def uploadtree_sync(self, directory, destination):
         logging.info("Uploading tree: {0} -> {1}".format(directory, destination))
@@ -371,8 +414,25 @@ class FTPShutil(object):
             remote_crc_file = ftp_path_join(remote_root, dircrc.crc_file_name)
             local_crc_file = os.path.join(root, dircrc.crc_file_name)
 
-            if not self.diff_dircrc(local_crc_file, remote_crc_file):
-                logging.info("Skipping directory: {0}".format(root))
-                continue
+            if not self.exists(remote_crc_file) or not os.path.isfile(local_crc_file):
+                logging.info("Processing directory: {0}".format(root))
 
-            self.make_remote(remote_root, root, dirs, files)
+                if self.isdir(remote_root):
+                    self.rmtree(remote_root)
+
+                self.make_remote(remote_root, root, dirs, files)
+
+            else:
+                remote_crc_data = self.read(remote_crc_file).decode("utf-8")
+                with open(local_crc_file, 'r') as fh:
+                    local_crc_data = fh.read()
+
+                comp = dircrc.Comparator(remote_crc_data, local_crc_data)
+
+                if comp.is_same():
+                    logging.info("Skipping directory: {0}".format(root))
+                    continue
+
+                logging.info("Processing directory: {0}".format(root))
+
+                self.make_remote(remote_root, root, dirs, files, comp)

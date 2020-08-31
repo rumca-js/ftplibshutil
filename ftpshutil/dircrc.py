@@ -5,9 +5,12 @@ import sys
 import zlib
 import configparser
 import glob
+import io
 
 
 crc_file_name = "crc_list.txt"
+crc_4_dir = -1
+section_name = "CRC List"
 
 
 def file_crc(afile):
@@ -28,7 +31,7 @@ def calc_dircrc(root, dirs, files):
 
     for name in sorted(dirs):
         big_name = os.path.join(root, name)
-        file_map[big_name] = -1   # special value, CRC is positive in python3
+        file_map[big_name] = crc_4_dir
 
     return file_map
 
@@ -48,7 +51,7 @@ def calc_dircrc_recursive(directory):
 def save_map_file(file_name, file_map):
     config = configparser.ConfigParser()
 
-    config["CRC List"] = file_map
+    config[section_name] = file_map
 
     with open(file_name , 'w') as configfile:
         config.write(configfile)
@@ -89,11 +92,11 @@ def copy_sync(src_dir, dst_dir, dst_handle):
         dst_handle.copytree(src, dst_dir)
 
     data = dst_handle.read(dst_crc_list)
-    buf = io.StringIO(data)
+    buf = io.BytesIO(data)
 
     config = configparser.ConfigParser()
     config.read(buf)
-    dst_map = dict(config["CRC List"])
+    dst_map = dict(config[section_name])
 
     src_map = create_crc_file(src_dir)
 
@@ -125,6 +128,88 @@ def remove_crc_files():
     crc_files = glob.glob("*/"+crc_file, recursive=True)
     for crc_file in crc_files:
         os.remove(crc_file)
+
+
+class Comparator(object):
+    def __init__(self, first, second):
+        self.data1 = first
+        self.data2 = second
+
+        self.cfg1 = configparser.ConfigParser()
+        self.cfg1.read_string(self.data1)
+
+        self.cfg2 = configparser.ConfigParser()
+        self.cfg2.read_string(self.data2)
+
+    def is_diff(self):
+        if self.data1 != self.data2:
+            return True
+        return False
+
+    def is_same(self):
+        if self.data1 == self.data2:
+            return True
+        return False
+
+    def get_1st_files(self):
+        files = []
+
+        for item in self.cfg1[section_name]:
+            val = int(self.cfg1[section_name][item])
+            if val != crc_4_dir:
+                files.append(item)
+
+        return files
+
+    def get_1st_dirs(self):
+        dirs = []
+
+        for item in self.cfg1[section_name]:
+            val = int(self.cfg1[section_name][item])
+            if val == crc_4_dir:
+                dirs.append(item)
+
+        return dirs
+
+    def get_2nd_files(self):
+        files = []
+
+        for item in self.cfg2[section_name]:
+            val = int(self.cfg2[section_name][item])
+            if val != crc_4_dir:
+                files.append(item)
+
+        return files
+
+    def get_2nd_dirs(self):
+        dirs = []
+        for item in self.cfg2[section_name]:
+            val = int(self.cfg2[section_name][item])
+            if val == crc_4_dir:
+                dirs.append(item)
+
+        return dirs
+
+    def get_1st_more_dirs(self):
+        return [item for item in self.get_1st_dirs() if item not in self.get_2nd_dirs() ]
+
+    def get_1st_more_files(self):
+        return [item for item in self.get_1st_files() if item not in self.get_2nd_files() ]
+
+    def get_2nd_more_dirs(self):
+        return [item for item in self.get_2nd_dirs() if item not in self.get_1st_dirs() ]
+
+    def get_2nd_more_files(self):
+        return [item for item in self.get_2nd_files() if item not in self.get_1st_files() ]
+
+    def get_modified_files(self):
+        files = []
+        for item in self.cfg1[section_name]:
+            if item in self.cfg2[section_name]:
+                if self.cfg1[section_name][item] != self.cfg2[section_name][item]:
+                    files.append(item)
+
+        return files
 
 
 def process_arguments():
@@ -159,17 +244,32 @@ def main():
             create_dircrcs(directory)
 
     elif args.diff:
-        conf = configparser.ConfigParser()
-        conf.read(args.diff[0])
-        one = conf["CRC List"]
+        with open(args.diff[0], 'r') as fh:
+            data1 = fh.read()
 
-        conf = configparser.ConfigParser()
-        conf.read(args.diff[1])
-        two = conf["CRC List"]
+        with open(args.diff[1], 'r') as fh:
+            data2 = fh.read()
 
-        diff_one, diff_two = diff_dir( one, two)
-        print(diff_one)
-        print(diff_two)
+        comp = Comparator(data1, data2)
+
+        print(comp.get_1st_files() )
+        print(comp.get_1st_dirs() )
+
+        print(comp.get_2nd_files() )
+        print(comp.get_2nd_dirs() )
+
+        print("1st more files")
+        print(comp.get_1st_more_files())
+        print("2nd more files")
+        print(comp.get_2nd_more_files())
+
+        print("1st more dirs")
+        print(comp.get_1st_more_dirs())
+        print("2nd more dirs")
+        print(comp.get_2nd_more_dirs())
+
+        print("modified")
+        print(comp.get_modified_files())
 
     elif args.remove:
         remove_crc_files()
