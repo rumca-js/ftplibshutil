@@ -23,6 +23,13 @@ def ftp_path_join(*paths):
     return joined.replace("\\", "/")
 
 
+def normpath(path):
+    """ FTP paths should have Linux OS separator? """
+    path = os.path.normpath(path)
+    path = path.replace("\\", "/")
+    return path
+
+
 def safe_root(path):
     """ os path join will not work on a directory that starts with root """
 
@@ -33,17 +40,17 @@ def safe_root(path):
     return path
 
 
-def walk_ftp_dir(ftp_shutil_obj, root_dir, topdown=True):
-    dirs = []
-    files = []
-    lines = []
-    clean_names = []
+def make_root(path):
+    if path[0] != "/":
+        path = "/"+path
 
-    ftp = ftp_shutil_obj.get_ftplib_handle()
+    return path
 
-    ftp.cwd(root_dir)
 
-    ftp.retrlines('LIST', lines.append)
+def listdir_ex(ftplib, path):
+    ftplib.cwd(path)
+
+    ftplib.retrlines('LIST', lines.append)
 
     for line in lines:
         m = re.search("([a-z-]*\s*\d*\s*\w*\s*\w*\s*\d*\s*\w*\s*\d*\s*\d*[:]*\d*\s*)", line)
@@ -60,6 +67,14 @@ def walk_ftp_dir(ftp_shutil_obj, root_dir, topdown=True):
             dirs.append(fname)
         if ftype=="file":
             files.append(fname)
+
+    return dirs, files
+
+
+def walk_ftp_dir(ftp_shutil_obj, root_dir, topdown=True):
+    ftp = ftp_shutil_obj.get_ftplib_handle()
+
+    dirs, files = listdir_ex(ftp, root_dir)
 
     if not topdown:
         for inner_dir in dirs:
@@ -89,32 +104,13 @@ class FTPShutil(object):
         return self._ftp
 
     def listdir(self, root_dir):
-        lines = []
-        dirs = []
-        files = []
+        dir_list = self._ftp.nlst(root_dir)
+        dir_list = [ os.path.split(x)[1] for x in dir_list] 
+        return dir_list
 
+    def listdir_ex(self, root_dir):
         ftp = self.get_ftplib_handle()
-        ftp.cwd(root_dir)
-
-        ftp.retrlines('LIST', lines.append)
-
-        for line in lines:
-            m = re.search("([a-z-]*\s*\d*\s*\w*\s*\w*\s*\d*\s*\w*\s*\d*\s*\d*[:]*\d*\s*)", line)
-            fname = line[m.end(1):]
-
-            if line.find("d") == 0:
-                ftype = "dir"
-            elif line.find('-') == 0:
-                ftype = "file"
-            else:
-                ftype = "none"
-
-            if ftype == "dir":
-                dirs.append(fname)
-            if ftype=="file":
-                files.append(fname)
-
-        return dirs, files
+        return listdir_ex(ftp, root_dir)
 
     def read(self, file_path):
         r = BytesIO()
@@ -123,12 +119,12 @@ class FTPShutil(object):
 
     def isfile(self, file_path):
         path, file_name = os.path.split(file_path)
-        dirs, files = self.listdir(path)
+        dirs, files = self.listdir_ex(path)
         return file_name in files
 
     def isdir(self, dir_path):
         path, dir_name = os.path.split(dir_path)
-        dirs, files = self.listdir(path)
+        dirs, files = self.listdir_ex(path)
         return dir_name in dirs
 
     def exists(self, path):
@@ -140,12 +136,11 @@ class FTPShutil(object):
         split_name = os.path.split(path)
 
         try:
-            dir_list = self._ftp.nlst(split_name[0])
+            dir_list = self.listdir(split_name[0])
         except Exception as E:
+            print(E)
             return False
 
-        dir_list = [ os.path.split(x)[1] for x in dir_list] 
-        
         if not split_name[1] in dir_list:
             return False
         return True
@@ -164,8 +159,7 @@ class FTPShutil(object):
 
     def remove_file(self, path):
         try:
-            path = os.path.normpath(path)
-            path = path.replace("\\", "/")
+            path = normpath(path)
             self._ftp.delete(path)
         except Exception as E:
             print("Problem with removing: {0}".format(path))
@@ -173,8 +167,7 @@ class FTPShutil(object):
 
     def remove_dir(self, path):
         try:
-            path = os.path.normpath(path)
-            path = path.replace("\\", "/")
+            path = normpath(path)
             self._ftp.rmd(path)
         except Exception as E:
             print("Problem with removing: {0}".format(path))
@@ -224,8 +217,7 @@ class FTPShutil(object):
         split_name = os.path.split(remote_file)
         path = split_name[0]
 
-        if path[0] != "/":
-            path = "/"+path
+        path = make_root(path)
 
         self._ftp.cwd(path)
 
