@@ -17,16 +17,10 @@ logging.basicConfig(level=logging.INFO)
 from ftplib import *
 
 
-def ftp_path_join(path1, path2, path3=None):
+def ftp_path_join(*paths):
     """ FTP paths should have Linux OS separator? """
-
-    # TODO this has to be written better
-    if not path3:
-        joined = os.path.join(path1, path2)
-        return joined.replace("\\", "/")
-    else:
-        joined = os.path.join(path1, path2, path3)
-        return joined.replace("\\", "/")
+    joined = os.path.join(*paths)
+    return joined.replace("\\", "/")
 
 
 def safe_root(path):
