@@ -199,7 +199,18 @@ class FTPShutil(object):
         logging.info("Creating remote directory {0}".format(path))
 
         split_name = os.path.split(path)
-        self._ftp.cwd(split_name[0])
+
+        # cannot go more than root - limit the recursion
+        if len(split_name) == 1:
+            raise IOError("Could not create directories")
+
+        try:
+            self._ftp.cwd(split_name[0])
+        except Exception as E:
+            print(E) # this might be redundant
+            self.makedirs(split_name[0])
+            self._ftp.cwd(split_name[0])
+
         self._ftp.mkd(split_name[1])
 
     def rename(self, fromname, toname):
