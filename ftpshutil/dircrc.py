@@ -10,6 +10,7 @@ import io
 
 crc_file_name = "crc_list.txt"
 crc_4_dir = -1
+crc_4_crc = -2
 section_name = "CRC List"
 
 
@@ -27,7 +28,7 @@ def calc_dircrc(root, dirs, files):
         if name != crc_file_name:
             file_map[big_name] = file_crc(big_name)
         else:
-            file_map[big_name] = -2
+            file_map[big_name] = crc_4_crc
 
     for name in sorted(dirs):
         big_name = os.path.join(root, name)
@@ -135,6 +136,7 @@ class Comparator(object):
         self.data1 = first
         self.data2 = second
 
+    def read(self):
         self.cfg1 = configparser.ConfigParser()
         self.cfg1.read_string(self.data1)
 
@@ -143,12 +145,15 @@ class Comparator(object):
 
     def is_diff(self):
         if self.data1 != self.data2:
+            self.read()
             return True
         return False
 
     def is_same(self):
         if self.data1 == self.data2:
             return True
+
+        self.read()
         return False
 
     def get_1st_files(self):
@@ -208,6 +213,9 @@ class Comparator(object):
             if item in self.cfg2[section_name]:
                 if self.cfg1[section_name][item] != self.cfg2[section_name][item]:
                     files.append(item)
+
+        if self.data1 != self.data2:
+            files.append(crc_file_name)
 
         return files
 
