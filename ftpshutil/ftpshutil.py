@@ -48,6 +48,10 @@ def make_root(path):
 
 
 def listdir_ex(ftplib, path):
+    lines = []
+    files = []
+    dirs = []
+
     ftplib.cwd(path)
 
     ftplib.retrlines('LIST', lines.append)
@@ -186,7 +190,7 @@ class FTPShutil(object):
 
         self.remove_dir(directory)
 
-    def mkdirs(self, path):
+    def makedirs(self, path):
         '''
         @brief for FTP part.    
         '''
@@ -224,6 +228,52 @@ class FTPShutil(object):
         with open( local_file, 'wb') as fp:
             self._ftp.retrbinary('RETR {0}'.format(split_name[1]), fp.write)
 
+    def make_local(self, local_root_dir, remote_root_dir, rem_dirs, rem_files):
+        """
+        @brief Adapts the local site according to the remote files.
+
+        @TODO remove local directories that are not present on the remote site.
+        @TODO remove local files that are not present on the remote site.
+        """
+
+        for adir in rem_dirs:
+            full_dir = os.path.join(local_root_dir, adir)
+            if not os.path.isdir(full_dir):
+                os.makedirs(full_dir)
+
+        for afile in rem_files:
+            remote_file = ftp_path_join(remote_root_dir, afile)
+            local_file = os.path.join(local_root_dir, afile)
+
+            if not os.path.isdir(local_root_dir):
+                os.makedirs(local_root_dir)
+
+            self.downloadfile(remote_file, local_file)
+
+    def make_remote(self, remote_root_dir, local_root_dir, loc_dirs, loc_files):
+        """
+        @brief Adapts the local site according to the remote files.
+
+        @TODO remove local directories that are not present on the remote site.
+        @TODO remove local files that are not present on the remote site.
+        """
+
+        rem_dirs, rem_files = self.listdir_ex(remote_root_dir)
+
+        for adir in loc_dirs:
+            full_dir = ftp_path_join(remote_root_dir, adir)
+            if not self.exists(full_dir):
+                self.makedirs(full_dir)
+
+        for afile in loc_files:
+            remote_file = ftp_path_join(remote_root_dir, afile)
+            local_file = os.path.join(local_root_dir, afile)
+
+            if not self.isdir(remote_root_dir):
+                self.makedirs(remote_root_dir)
+
+            self.uploadfile(local_file, remote_file)
+
     def downloadtree(self, directory, destination):
         '''
         @brief Probably best to supply directory as an absolute FTP path.
@@ -232,20 +282,10 @@ class FTPShutil(object):
 
         try:
             for root, dirs, files in walk_ftp_dir(self, directory):
-                sroot = safe_root(root)
+                remote_root_dir = safe_root(root)
+                local_root_dir = os.path.join(destination, remote_root_dir)
 
-                for adir in dirs:
-                    pass
-
-                for afile in files:
-                    remote_file = ftp_path_join(sroot, afile)
-
-                    local_root_dir = os.path.join(destination, sroot)
-
-                    if not os.path.isdir(local_root_dir):
-                        os.makedirs(local_root_dir)
-
-                    self.downloadfile(remote_file, os.path.join(local_root_dir, afile))
+                self.make_local(local_root_dir, remote_root_dir, dirs, files)
 
         except Exception as e:
             print("Could not obtain directory {0}\n{1}".format(directory, str(e) ))
@@ -278,9 +318,8 @@ class FTPShutil(object):
         try:
             for root, dirs, files in walk_ftp_dir(self, directory):
 
-                sroot  = safe_root(root)
-
-                local_root_dir = os.path.join(destination, sroot)
+                remote_root_dir  = safe_root(root)
+                local_root_dir = os.path.join(destination, remote_root_dir)
 
                 local_crc_file = os.path.join(local_root_dir, dircrc.crc_file_name)
                 remote_crc_file = ftp_path_join(root, dircrc.crc_file_name)
@@ -289,18 +328,7 @@ class FTPShutil(object):
                     logging.info("Skipping directory: {0}".format(root))
                     continue
 
-                for adir in dirs:
-                    full_dir = os.path.join(local_root_dir, adir)
-                    if not os.path.isdir(full_dir):
-                        os.makedirs(full_dir)
-
-                for afile in files:
-                    remote_file = ftp_path_join(sroot, afile)
-
-                    if not os.path.isdir(local_root_dir):
-                        os.makedirs(local_root_dir)
-
-                    self.downloadfile(remote_file, os.path.join(local_root_dir, afile))
+                self.make_local(local_root_dir, remote_root_dir, dirs, files)
 
         except Exception as e:
             print("Could not obtain directory {0}\n{1}".format(directory, str(e) ))
@@ -321,19 +349,7 @@ class FTPShutil(object):
             if remote_root.endswith("/"):
                 remote_root = remote_root[:-1]
 
-            if not self.exists(remote_root):
-                self.mkdirs(remote_root)
-
-            for adir in dirs:
-                dst_dir = ftp_path_join(remote_root, adir)
-                
-                if not self.exists(dst_dir):
-                    self.mkdirs(dst_dir)
-
-            for afile in files:
-                remote_file = ftp_path_join(remote_root, afile)
-                local_file = os.path.join(root, afile)
-                self.uploadfile(local_file, remote_file)
+            self.make_remote(remote_root, root, dirs, files)
 
     def uploadtree_sync(self, directory, destination):
         logging.info("Uploading tree: {0} -> {1}".format(directory, destination))
@@ -359,18 +375,4 @@ class FTPShutil(object):
                 logging.info("Skipping directory: {0}".format(root))
                 continue
 
-            if not self.exists(remote_root):
-                self.mkdirs(remote_root)
-
-            for adir in dirs:
-                dst_dir = ftp_path_join(remote_root, adir)
-                
-                if not self.exists(dst_dir):
-                    self.mkdirs(dst_dir)
-
-            for afile in files:
-                remote_file = ftp_path_join(remote_root, afile)
-                local_file = os.path.join(root, afile)
-                self.uploadfile(local_file, remote_file)
-
-
+            self.make_remote(remote_root, root, dirs, files)
