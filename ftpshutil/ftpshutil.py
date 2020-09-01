@@ -257,6 +257,10 @@ class FTPShutil(object):
             redundant_things = crc_data.get_2nd_more_files()
             redundant_things.extend( crc_data.get_2nd_more_dirs())
 
+            rem_files = [ os.path.split(item)[1] for item in rem_files ]
+            rem_dirs = [ os.path.split(item)[1] for item in rem_dirs ]
+            redundant_things = [ os.path.split(item)[1] for item in redundant_things ]
+
             for redundant in redundant_things:
                 redundant = os.path.join(local_root_dir, redundant)
 
@@ -294,6 +298,10 @@ class FTPShutil(object):
 
             redundant_things = crc_data.get_1st_more_files()
             redundant_things.extend( crc_data.get_1st_more_dirs())
+
+            loc_files = [ os.path.split(item)[1] for item in loc_files ]
+            loc_dirs = [ os.path.split(item)[1] for item in loc_dirs ]
+            redundant_things = [ os.path.split(item)[1] for item in redundant_things ]
 
             for redundant in redundant_things:
                 redundant = ftp_path_join(remote_root_dir, redundant)

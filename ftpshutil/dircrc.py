@@ -51,6 +51,7 @@ def calc_dircrc_recursive(directory):
 
 def save_map_file(file_name, file_map):
     config = configparser.ConfigParser()
+    config.optionxform = lambda option: option
 
     config[section_name] = file_map
 
@@ -138,9 +139,11 @@ class Comparator(object):
 
     def read(self):
         self.cfg1 = configparser.ConfigParser()
+        self.cfg1.optionxform = lambda option: option
         self.cfg1.read_string(self.data1)
 
         self.cfg2 = configparser.ConfigParser()
+        self.cfg2.optionxform = lambda option: option
         self.cfg2.read_string(self.data2)
 
     def is_diff(self):
