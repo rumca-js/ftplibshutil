@@ -7,17 +7,20 @@ import argparse
 import logging
 import shutil
 import subprocess
+import ftpshutil.ftpconfig as ftpconfig
 
 # requires github/rumca-js/ftplibshutil
 import ftpshutil
 
 
 def connect():
-    myserver = 'server.com'
-    myuser = 'user'
-    mypass = 'password'
+    config = ftpconfig.FtpConfig()
+    config.read()
 
-    ftp = ftpshutil.FTPShutil(myserver, user=myuser, passwd=mypass )     # connect to host, default port
+    ftp = ftpshutil.FTPShutil(config.get("server"), 
+                              user=config.get("user"), 
+                              passwd=config.get("password") )
+
     logging.info("Connected")
     return ftp
 

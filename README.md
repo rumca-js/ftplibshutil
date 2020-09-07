@@ -7,7 +7,7 @@ python3 setup.py install
 You can use directly ftpshutil/ftpshutil.py file in your project instead of installing with setup tools.
 
 # API
-Can be observed using examples/down.py. Provides FTPShutil class with the following methods:
+Can be observed using examples/ftpmgr.py. Provides FTPShutil class with the following methods:
  - downloadtree
      ```
      def downloadtree(self, directory, destination):

@@ -10,6 +10,8 @@ import re
 import argparse
 import logging
 import shutil
+import traceback
+import sys
 
 from io import BytesIO
 import ftpshutil.dircrc as dircrc
@@ -123,6 +125,11 @@ class FTPShutil(object):
         self._ftp.retrbinary('RETR {0}'.format(file_path), r.write)
         return r.getvalue()
 
+    def write(self, file_path, data):
+        r = BytesIO(data)
+        self._ftp.storbinary('STOR {0}'.format(file_path), r)
+        return r.getvalue()
+
     def isfile(self, file_path):
         path, file_name = os.path.split(file_path)
         dirs, files = self.listdir_ex(path)
@@ -192,12 +199,17 @@ class FTPShutil(object):
 
         self.remove_dir(directory)
 
+    def mkdir(self, path):
+        logging.info("Creating remote directory {0}".format(path))
+
+        split_name = os.path.split(path)
+        self._ftp.cwd(split_name[0])
+        self._ftp.mkd(split_name[1])
+
     def makedirs(self, path):
         '''
         @brief for FTP part.    
         '''
-        logging.info("Creating remote directory {0}".format(path))
-
         split_name = os.path.split(path)
 
         # cannot go more than root - limit the recursion
@@ -206,10 +218,11 @@ class FTPShutil(object):
 
         try:
             self._ftp.cwd(split_name[0])
-        except Exception as E:
-            print(E) # this might be redundant
+        except error_perm as E:
             self.makedirs(split_name[0])
             self._ftp.cwd(split_name[0])
+
+        logging.info("Creating remote directories {0}".format(path))
 
         self._ftp.mkd(split_name[1])
 
