@@ -168,7 +168,7 @@ class FTPShutil(object):
                 raise IOError("FTP: Specified path does not exist: {0}".format(path))
         except Exception as E:
             print("Problem with removing: {0}".format(path))
-            raise E
+            #raise E
 
     def remove_file(self, path):
         try:
