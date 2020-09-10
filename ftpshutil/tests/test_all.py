@@ -1,9 +1,12 @@
 
 import unittest
 import logging
+import os
 
 import ftpshutil
 import ftpshutil.ftpconfig as ftpconfig
+
+import ftpshutil.dircrc as dircrc
 
 
 class TestStringMethods(unittest.TestCase):
@@ -56,6 +59,23 @@ class TestStringMethods(unittest.TestCase):
         TestStringMethods.ftp.write("/Test/uno/my_file", b"test")
 
         self.assertTrue( TestStringMethods.ftp.read("/Test/uno/my_file") == b"test")
+
+    def test_crc(self):
+        dircrc.create_dircrcs("test")
+
+        crc_file = os.path.join("test", "crc_list.txt")
+        self.assertTrue( os.path.isfile( crc_file))
+
+        with open(crc_file, 'r') as fh:
+            data = fh.read()
+
+        example = """[CRC List]
+./crc_list.txt = -2
+./one_test_file.txt = 4227995677
+
+"""
+
+        self.assertTrue( example == data)
 
 
 if __name__ == '__main__':

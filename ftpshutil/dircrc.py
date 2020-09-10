@@ -1,3 +1,6 @@
+"""
+The CRC subsystem will use linux path separator.
+"""
 
 import argparse
 import os
@@ -31,7 +34,7 @@ def calc_dircrc(root, dirs, files):
             file_map[big_name] = crc_4_crc
 
     for name in sorted(dirs):
-        big_name = os.path.join(root, name)
+        big_name = "/".join(root, name)
         file_map[big_name] = crc_4_dir
 
     return file_map
