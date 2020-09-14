@@ -33,6 +33,9 @@ class CrcFile(object):
     def set_entries(self, file_map):
         self.themap = file_map
 
+    def get_entries(self):
+        return self.themap
+
     def read(self, file_name):
         with open(file_name, 'rb') as fh:
             data = fh.read().decode('utf-8')
@@ -236,10 +239,10 @@ class Comparator(object):
     def get_1st_dirs(self):
         return self.cfg1.get_dirs()
 
-    def get_2st_files(self):
+    def get_2nd_files(self):
         return self.cfg2.get_files()
 
-    def get_2st_dirs(self):
+    def get_2nd_dirs(self):
         return self.cfg2.get_dirs()
 
     def get_1st_more_dirs(self):
@@ -256,9 +259,12 @@ class Comparator(object):
 
     def get_modified_files(self):
         files = []
-        for item in self.cfg1[SECTION_NAME]:
-            if item in self.cfg2[SECTION_NAME]:
-                if self.cfg1[SECTION_NAME][item] != self.cfg2[SECTION_NAME][item]:
+        map_entries1 = self.cfg1.get_entries()
+        map_entries2 = self.cfg2.get_entries()
+
+        for item in map_entries1:
+            if item in map_entries2:
+                if map_entries1[item] != map_entries2[item]:
                     files.append(item)
 
         if self.data1 != self.data2:
