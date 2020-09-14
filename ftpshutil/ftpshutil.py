@@ -398,8 +398,8 @@ class FTPShutil(object):
                 remote_root_dir  = safe_root(root)
                 local_root_dir = os.path.join(destination, remote_root_dir)
 
-                local_crc_file = os.path.join(local_root_dir, dircrc.crc_file_name)
-                remote_crc_file = ftp_path_join(root, dircrc.crc_file_name)
+                local_crc_file = os.path.join(local_root_dir, dircrc.CRC_FILE_NAME)
+                remote_crc_file = ftp_path_join(root, dircrc.CRC_FILE_NAME)
 
                 if not self.exists(remote_crc_file) or not os.path.isfile(local_crc_file):
                     logging.info("Processing directory: {0}".format(root))
@@ -443,8 +443,8 @@ class FTPShutil(object):
             if remote_root.endswith("/"):
                 remote_root = remote_root[:-1]
 
-            remote_crc_file = ftp_path_join(remote_root, dircrc.crc_file_name)
-            local_crc_file = os.path.join(root, dircrc.crc_file_name)
+            remote_crc_file = ftp_path_join(remote_root, dircrc.CRC_FILE_NAME)
+            local_crc_file = os.path.join(root, dircrc.CRC_FILE_NAME)
 
             if not self.exists(remote_crc_file) or not os.path.isfile(local_crc_file):
                 logging.info("Processing directory: {0}".format(root))

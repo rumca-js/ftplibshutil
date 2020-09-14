@@ -11,31 +11,100 @@ import glob
 import io
 
 
-crc_file_name = "crc_list.txt"
-crc_4_dir = -1
-crc_4_crc = -2
-section_name = "CRC List"
+CRC_FILE_NAME = "crc_list.txt"
+CRC_4_DIR = -1
+CRC_4_CRC = -2
+SECTION_NAME = "CRC List"
 
 
-def file_crc(afile):
-    with open(afile, 'rb') as fh:
-        data = fh.read()
+class CrcFile(object):
+    """
+    We do not use ConfigParser here for writing.
+     1. it does not allow for simple use of unix line endings on windows
+     2. for case sensitivity we have to create lambda functions (ugly).
+    """
 
-        return zlib.crc32(data)
+    def calc_crc(afile):
+        with open(afile, 'rb') as fh:
+            data = fh.read()
+
+            return zlib.crc32(data)
+
+    def set_entries(self, file_map):
+        self.themap = file_map
+
+    def read(self, file_name):
+        with open(file_name, 'rb') as fh:
+            data = fh.read().decode('utf-8')
+
+        cfg = configparser.ConfigParser()
+        cfg.optionxform = lambda option: option
+        cfg.read_string(data)
+
+        self.themap = dict(cfg[SECTION_NAME])
+
+    def read_data(self, data):
+        cfg = configparser.ConfigParser()
+        cfg.optionxform = lambda option: option
+        cfg.read_string(data)
+
+        self.themap = dict(cfg[SECTION_NAME])
+
+    def write(self, file_name):
+
+        with open(file_name, 'wb') as fh:
+            text = "[{0}]\n".format(SECTION_NAME)
+            fh.write(text.encode('utf-8'))
+
+            keys = sorted(self.get_files())
+            for key in keys:
+                self.write_key(fh, key)
+
+            keys = sorted(self.get_dirs())
+            for key in keys:
+                self.write_key(fh, key)
+
+            fh.write("\n".encode('utf-8'))
+    
+    def write_key(self, fh, key):
+        value = self.themap[key]
+        text = "{0} = {1}\n".format(key, value)
+        fh.write(text.encode('utf-8'))
+
+    def get_files(self):
+        files = []
+
+        for item in self.themap:
+            val = int(self.themap[item])
+            if val != CRC_4_DIR:
+                files.append(item)
+
+        return files
+
+    def get_dirs(self):
+        dirs = []
+
+        for item in self.themap:
+            val = int(self.themap[item])
+            if val == CRC_4_DIR:
+                dirs.append(item)
+
+        return dirs
 
 
 def calc_dircrc(root, dirs, files):
+    """ Calculate for this root"""
     file_map = {}
     for name in sorted(files):
-        big_name = os.path.join(root, name)
-        if name != crc_file_name:
-            file_map[big_name] = file_crc(big_name)
+        big_name = "/".join([root, name])
+        if name != CRC_FILE_NAME:
+            file_map[big_name] = CrcFile.calc_crc(big_name)
         else:
-            file_map[big_name] = crc_4_crc
+            file_map[big_name] = CRC_4_CRC
 
     for name in sorted(dirs):
         big_name = "/".join([root, name])
-        file_map[big_name] = crc_4_dir
+        file_map[big_name] = CRC_4_DIR
 
     return file_map
 
@@ -52,21 +121,14 @@ def calc_dircrc_recursive(directory):
     return file_map
 
 
-def save_map_file(file_name, file_map):
-    config = configparser.ConfigParser()
-    config.optionxform = lambda option: option
-
-    config[section_name] = file_map
-
-    with open(file_name , 'w') as configfile:
-        config.write(configfile)
-
-
 def create_dircrc(directory):
     file_map = calc_dircrc_recursive(directory)
 
-    output_name = crc_file_name
-    save_map_file(os.path.join(directory, output_name), file_map)
+    output_name = CRC_FILE_NAME
+
+    crcfile = CrcFile()
+    crcfile.set_entries(file_map)
+    crcfile.write(os.path.join(directory, output_name))
 
     return file_map
 
@@ -78,8 +140,11 @@ def create_dircrcs(directory):
         file_map = calc_dircrc(".", dirs, files)
         os.chdir(cur_path)
 
-        output_name = crc_file_name
-        save_map_file( os.path.join(root, output_name), file_map)
+        output_name = CRC_FILE_NAME
+
+        crcfile = CrcFile()
+        crcfile.set_entries(file_map)
+        crcfile.write( os.path.join(root, output_name))
 
 
 def diff_dir(one_dir, two_dir):
@@ -92,7 +157,7 @@ def diff_dir(one_dir, two_dir):
 
 
 def copy_sync(src_dir, dst_dir, dst_handle):
-    dst_crc_list = os.path.join(dst_dir, crc_file_name)
+    dst_crc_list = os.path.join(dst_dir, CRC_FILE_NAME)
     if not dst_handle.exists(dst_crc_list):
         dst_handle.copytree(src, dst_dir)
 
@@ -101,7 +166,7 @@ def copy_sync(src_dir, dst_dir, dst_handle):
 
     config = configparser.ConfigParser()
     config.read(buf)
-    dst_map = dict(config[section_name])
+    dst_map = dict(config[SECTION_NAME])
 
     src_map = create_crc_file(src_dir)
 
@@ -126,7 +191,7 @@ def copy_sync(src_dir, dst_dir, dst_handle):
 
 def remove_crc_files():
 
-    crc_file = crc_file_name
+    crc_file = CRC_FILE_NAME
     if os.path.isfile(crc_file):
         os.remove(crc_file)
 
@@ -136,18 +201,21 @@ def remove_crc_files():
 
 
 class Comparator(object):
+    """ TODO switch to CrcFile.
+     1. it does not allow for simple use of unix line endings on windows
+     2. for case sensitivity we have to create lambda functions (ugly).
+    """
+
     def __init__(self, first, second):
         self.data1 = first
         self.data2 = second
 
     def read(self):
-        self.cfg1 = configparser.ConfigParser()
-        self.cfg1.optionxform = lambda option: option
-        self.cfg1.read_string(self.data1)
+        self.cfg1 = CrcFile()
+        self.cfg1.read_data(self.data1)
 
-        self.cfg2 = configparser.ConfigParser()
-        self.cfg2.optionxform = lambda option: option
-        self.cfg2.read_string(self.data2)
+        self.cfg2 = CrcFile()
+        self.cfg2.read_data(self.data2)
 
     def is_diff(self):
         if self.data1 != self.data2:
@@ -163,43 +231,16 @@ class Comparator(object):
         return False
 
     def get_1st_files(self):
-        files = []
-
-        for item in self.cfg1[section_name]:
-            val = int(self.cfg1[section_name][item])
-            if val != crc_4_dir:
-                files.append(item)
-
-        return files
+        return self.cfg1.get_files()
 
     def get_1st_dirs(self):
-        dirs = []
+        return self.cfg1.get_dirs()
 
-        for item in self.cfg1[section_name]:
-            val = int(self.cfg1[section_name][item])
-            if val == crc_4_dir:
-                dirs.append(item)
+    def get_2st_files(self):
+        return self.cfg2.get_files()
 
-        return dirs
-
-    def get_2nd_files(self):
-        files = []
-
-        for item in self.cfg2[section_name]:
-            val = int(self.cfg2[section_name][item])
-            if val != crc_4_dir:
-                files.append(item)
-
-        return files
-
-    def get_2nd_dirs(self):
-        dirs = []
-        for item in self.cfg2[section_name]:
-            val = int(self.cfg2[section_name][item])
-            if val == crc_4_dir:
-                dirs.append(item)
-
-        return dirs
+    def get_2st_dirs(self):
+        return self.cfg2.get_dirs()
 
     def get_1st_more_dirs(self):
         return [item for item in self.get_1st_dirs() if item not in self.get_2nd_dirs() ]
@@ -215,13 +256,13 @@ class Comparator(object):
 
     def get_modified_files(self):
         files = []
-        for item in self.cfg1[section_name]:
-            if item in self.cfg2[section_name]:
-                if self.cfg1[section_name][item] != self.cfg2[section_name][item]:
+        for item in self.cfg1[SECTION_NAME]:
+            if item in self.cfg2[SECTION_NAME]:
+                if self.cfg1[SECTION_NAME][item] != self.cfg2[SECTION_NAME][item]:
                     files.append(item)
 
         if self.data1 != self.data2:
-            files.append(crc_file_name)
+            files.append(CRC_FILE_NAME)
 
         return files
 

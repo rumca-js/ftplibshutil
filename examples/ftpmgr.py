@@ -8,6 +8,7 @@ import logging
 import shutil
 import subprocess
 import ftpshutil.ftpconfig as ftpconfig
+import ftpshutil.dircrc as dircrc
 
 # requires github/rumca-js/ftplibshutil
 import ftpshutil
@@ -50,6 +51,7 @@ def read_args():
     parser.add_argument('-u', '--upload', dest='upload', action="store_true",  help='Upload operation)')
     parser.add_argument('--up-sync', dest='upload_sync', action="store_true",  help='Upload operation)')
     parser.add_argument('--down-sync', dest='download_sync', action="store_true", help='Download operation')
+    parser.add_argument('-c', dest='crc', action="store_true", help='Generate CRC')
     parser.add_argument('-t', dest='test', action="store_true", help='Test operation')
 
     args = parser.parse_args()
@@ -146,6 +148,9 @@ def main():
         ftp.downloadfile("/.htaccess", "./.htaccess")
 
         ftp.quit()
+
+    elif args.crc:
+        dircrc.create_dircrcs('dyi-page')
 
     elif args.test:
         ftp = connect()
