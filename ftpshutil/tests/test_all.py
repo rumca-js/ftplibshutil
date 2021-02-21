@@ -30,7 +30,7 @@ class FtpMock(FTP):
                 result.append(afile)
                 
         for adir in self._dirs:
-            if afile.startswith(apath):
+            if adir.startswith(apath) and adir != apath:
                 result.append(adir)
                 
         return result
@@ -48,34 +48,52 @@ class FtpMock(FTP):
             raise error_perm("No such path: "+path)
         
     def mkd(self, adir):
+        if not adir.startswith("/"):
+             adir = os.path.join(self._cwd, adir)
+
         dst_dir = os.path.join(self._cwd, adir)
         if dst_dir not in self._dirs:
             self._dirs.append(dst_dir)
         
     def rmd(self, adir):
+        if not adir.startswith("/"):
+             adir = os.path.join(self._cwd, adir)
+
         self._dirs.remove(adir)
         
     def retrlines(self, cmd, callback = None):
-        dirstring = 'drwxr-sr-x    5 1176     1176         4096 Dec 19  2000 {}'
-        filestring = '-rw-rw-r--    1 1176     1176         1063 Jun 15 10:18 {}'
-        result = ''
-    
-        for afile in self._files:
-            filestring = filestring.format(afile)
-            result += filestring + "\n"
-            
-        for adir in self._dirs:
-            dirstring = dirstring.format(adir)
-            result += dirstring + "\n"
-    
-        return result
+        if cmd == "LIST":
+            dirstring = "drwxr-sr-x    5 1176     1176         4096 Dec 19  2000 "
+            filestring = '-rw-rw-r--    1 1176     1176         1063 Jun 15 10:18 '
+            result = ''
+        
+            for afile in self._files:
+                sp = os.path.split(afile)
+                if sp[0] == self._cwd:
+                    filestring = filestring + sp[1]
+                    callback(filestring)
+                    result += filestring + "\n"
+                
+            for adir in self._dirs:
+                sp = os.path.split(adir)
+                if sp[0] == self._cwd:
+                    dirstring = dirstring + sp[1]
+                    callback(dirstring)
+                    result += dirstring + "\n"
+        
+            return result
         
     def storbinary(self, cmd, fp, blocksize=8192, callback=None, rest=None):
         sp = cmd.split(" ")
         if sp[0] == "STOR":
             afile = sp[1]
+
+            if not afile.startswith("/"):
+                afile = os.path.join(self._cwd, afile)
+
             contents = fp.read()
             self._files[afile] = contents
+        fp.close()
         
     def retrbinary(self, cmd, callback=None, blocksize=8192, rest=None):
         sp = cmd.split(" ")
@@ -83,6 +101,15 @@ class FtpMock(FTP):
             afile = sp[1]
             if afile in self._files:
                 callback(self._files[afile])
+
+    def delete(self, path):
+        if not path.startswith("/"):
+             path = os.path.join(self._cwd, path)
+        
+        if path in self._files:
+            self._files.pop(path)
+        if path in self._dirs:
+            self._dirs.remove(path)
 
 
 class TestStringMethods(unittest.TestCase):
@@ -111,8 +138,8 @@ class TestStringMethods(unittest.TestCase):
         TestStringMethods.ftp.mkdir("/Test")
                 
         self.assertTrue( TestStringMethods.ftp._ftp._dirs == ['/','/Test'])
-
         self.assertTrue( TestStringMethods.ftp.exists("/Test") )
+        self.assertTrue( TestStringMethods.ftp.isdir("/Test") )
 
     def test_rmtree(self):
         TestStringMethods.ftp.mkdir("/Test")
@@ -132,8 +159,13 @@ class TestStringMethods(unittest.TestCase):
         self.assertTrue( TestStringMethods.ftp.exists("/Test") )
         self.assertTrue( TestStringMethods.ftp.exists("/Test/uno") )
 
+        self.assertTrue( TestStringMethods.ftp.isdir("/Test") )
+        self.assertTrue( TestStringMethods.ftp.isdir("/Test/uno") )
+
     def test_listdir_empty_dir(self):
         TestStringMethods.ftp.makedirs("/Test/uno")
+
+        self.assertTrue("/Test/uno" in TestStringMethods.ftp._ftp._dirs)
 
         self.assertTrue( TestStringMethods.ftp.listdir("/Test/uno") == [])
 
@@ -141,7 +173,20 @@ class TestStringMethods(unittest.TestCase):
         TestStringMethods.ftp.makedirs("/Test/uno")
         TestStringMethods.ftp.write("/Test/uno/my_file", b"test")
 
+        TestStringMethods.ftp.isfile("/Test/uno/my_file")
+
         self.assertTrue( TestStringMethods.ftp.read("/Test/uno/my_file") == b"test")
+
+    def test_upload(self):
+        TestStringMethods.ftp.makedirs("/Test")
+        TestStringMethods.ftp.uploadfile("setup.py", "/Test/setup.py")
+
+        self.assertTrue( TestStringMethods.ftp.isfile("/Test/setup.py") )
+
+        with open("setup.py", 'rb') as fh:
+            data = fh.read()
+
+        self.assertTrue(TestStringMethods.ftp._ftp._files["/Test/setup.py"] == data)
 
     def test_crc(self):
         dircrc.create_dircrcs("test")

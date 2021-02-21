@@ -128,7 +128,6 @@ class FTPShutil(object):
     def write(self, file_path, data):
         r = BytesIO(data)
         self._ftp.storbinary('STOR {0}'.format(file_path), r)
-        return r.getvalue()
 
     def isfile(self, file_path):
         path, file_name = os.path.split(file_path)
