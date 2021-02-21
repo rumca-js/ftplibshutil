@@ -128,9 +128,8 @@ It is important to know that right now the entire directory is transferred, is s
 
 The CRC file is a simple INI file format, with one section. It contains a list of files with checksum values, and directory listing.
 
-# Other
+# Also available at pip
 
-You can try installing this using pip. I have not checked if that works.
 ```
-pip install git+https://github.com/rumca-js/ftplibshutil.git#egg=ftpshutil-renegat0x0
+pip install ftpshutil
 ```
