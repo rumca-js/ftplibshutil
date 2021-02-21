@@ -99,7 +99,7 @@ def walk_ftp_dir(ftp_shutil_obj, root_dir, topdown=True):
 
 class FTPShutil(object):
 
-    def __init__(self, host, user, passwd):
+    def __init__(self, host='', user='', passwd=''):
         self._ftp = FTP(host, user=user, passwd=passwd )     # connect to host, default port 
 
     def login(self, user, passwd):
